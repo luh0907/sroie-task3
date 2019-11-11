@@ -32,10 +32,10 @@ def main():
             val_size=args.val_size,
             test_path="data/test_dict.pth",
         )
-        train_data, train_labels = dataset.get_train_data(batch_size=args.batch_size)
+        train_data, train_labels = dataset.get_train_data(batch_size=550)
         print(train_data.shape, train_labels.shape)
 
-        model.compile(optimizer='adam', loss=tf.keras.losses.CategoricalCrossentropy(from_logits=True))
+        model.compile(optimizer='adam', loss='sparse_categorical_crossentropy')
         model.fit(train_data, train_labels, batch_size=args.batch_size, epochs=args.max_epoch)
 
     '''
