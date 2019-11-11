@@ -5,13 +5,12 @@ from os import path
 from string import ascii_uppercase, digits, punctuation
 
 import colorama
-import numpy
+import numpy as np
 import regex
 import tensorflow as tf
-from tf.keras.utils import to_categorical
+from tensorflow.keras.utils import to_categorical
 import pickle
 from colorama import Fore
-from torch.utils import data
 
 from my_classes import TextBox, TextLine
 from my_utils import robust_padding
@@ -44,30 +43,30 @@ class Dataset(object):
 
     def get_test_data(self, key):
         text = self.test_dict[key]
-        text_tensor = torch.zeros(len(text), 1, dtype=torch.long)
-        text_tensor[:, 0] = torch.LongTensor([VOCAB.find(c) for c in text])
+        text_data = np.zeros((1, len(text)), dtype='int64')
+        text_data[0, :] = np.array([VOCAB.find(c) for c in text])
 
-        return text_tensor.to(self.device)
+        return text_data
 
     def get_train_data(self, batch_size=8):
         samples = random.sample(self.train_dict.keys(), batch_size)
 
         texts = [self.train_dict[k][0] for k in samples]
-        labels = [to_categorical(self.train_dict[k][1], num_classes=5) for k in samples]
+        labels = [self.train_dict[k][1] for k in samples]
 
         robust_padding(texts, labels)
 
         maxlen = max(len(t) for t in texts)
 
-        text_tensor = torch.zeros(maxlen, batch_size, dtype=torch.long)
+        text_data = np.zeros((batch_size, maxlen), dtype='int64')
         for i, text in enumerate(texts):
-            text_tensor[:, i] = torch.LongTensor([VOCAB.find(c) for c in text])
+            text_data[i, :] = np.array([VOCAB.find(c) for c in text])
 
-        truth_tensor = torch.zeros(maxlen, batch_size, dtype=torch.long)
+        truth_data = np.zeros((batch_size, maxlen), dtype='int64')
         for i, label in enumerate(labels):
-            truth_tensor[:, i] = torch.LongTensor(label)
+            truth_data[i, :] = np.array(label)
 
-        return text_tensor.to(self.device), truth_tensor.to(self.device)
+        return text_data, truth_data
 
     def get_val_data(self, batch_size=8, device="cpu"):
         keys = random.sample(self.val_dict.keys(), batch_size)
@@ -78,19 +77,19 @@ class Dataset(object):
         maxlen = max(len(s) for s in texts)
         texts = [s.ljust(maxlen, " ") for s in texts]
         labels = [
-            numpy.pad(a, (0, maxlen - len(a)), mode="constant", constant_values=0)
+            np.pad(a, (0, maxlen - len(a)), mode="constant", constant_values=0)
             for a in labels
         ]
 
-        text_tensor = torch.zeros(maxlen, batch_size, dtype=torch.long)
+        text_data = np.zeros((batch_size, maxlen), dtype='int64')
         for i, text in enumerate(texts):
-            text_tensor[:, i] = torch.LongTensor([VOCAB.find(c) for c in text])
+            text_data[i, :] = np.array([VOCAB.find(c) for c in text])
 
-        truth_tensor = torch.zeros(maxlen, batch_size, dtype=torch.long)
+        truth_data = np.zeros((batch_size, maxlen), dtype='int64')
         for i, label in enumerate(labels):
-            truth_tensor[:, i] = torch.LongTensor(label)
+            truth_tensor[i, :] = np.array(label)
 
-        return keys, text_tensor.to(self.device), truth_tensor.to(self.device)
+        return keys, text_data, truth_data
 
 
 def torchdict_loader(file_path):
@@ -133,7 +132,7 @@ def sort_text(txt_file):
 
     return "\n".join([str(text_line) for text_line in text_lines])
 
-
+'''
 def create_test_data():
     keys = sorted(
         path.splitext(f.name)[0]
@@ -164,7 +163,7 @@ def create_data(data_path="tmp/data/"):
         text = sort_text(txt_file)
         text_space = regex.sub(r"[\t\n]", " ", text)
 
-        text_class = numpy.zeros(len(text), dtype=int)
+        text_class = np.zeros(len(text), dtype=int)
 
         print()
         print(json_file.path, txt_file.path)
@@ -202,7 +201,7 @@ def create_data(data_path="tmp/data/"):
         # color_print(text, text_class)
 
     return keys, data_dict
-
+'''
 
 def color_print(text, text_class):
     colorama.init()
@@ -222,7 +221,8 @@ def color_print(text, text_class):
 
 
 if __name__ == "__main__":
-    create_test_data()
+    pass
+    # create_test_data()
 
     # dataset = MyDataset("data/data_dict2.pth")
     # text, truth = dataset.get_train_data()

@@ -1,5 +1,6 @@
-from tf.keras.models import Model
-from tf.keras.layers import Embedding, Bidirectional, Dense, LSTMCell
+import tensorflow as tf
+from tensorflow.keras.models import Model
+from tensorflow.keras.layers import Embedding, Bidirectional, Dense, LSTMCell, RNN
 
 class SimpleBiLSTM(Model):
     def __init__(self, vocab_size, embed_size, hidden_size):
@@ -17,7 +18,10 @@ class SimpleBiLSTM(Model):
 
     def call(self, inputs):
         embedded = self.embed(inputs)
-        feature, _ = self.bilstm(embedded)
+        #feature = tf.map_fn(lambda x: x[0], self.bilstm(embedded))
+        feature = self.bilstm(embedded)
+        print("****")
+        print(feature.shape)
         outputs = self.linear(feature)
 
         return outputs

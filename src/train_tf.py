@@ -3,10 +3,10 @@ import json
 
 import tensorflow as tf
 
-from my_data import VOCAB, color_print
-from data_loader import Dataset
+#from my_data import VOCAB, color_print
+from data_loader import Dataset, VOCAB, color_print
 #from my_models import MyModel0
-from models import SimpleBiLSTM
+from models.SimpleBiLSTM import SimpleBiLSTM
 from my_utils import pred_to_dict
 
 
@@ -33,10 +33,12 @@ def main():
             test_path="data/test_dict.pth",
         )
         train_data, train_labels = dataset.get_train_data(batch_size=args.batch_size)
+        print(train_data.shape, train_labels.shape)
 
         model.compile(optimizer='adam', loss=tf.keras.losses.CategoricalCrossentropy(from_logits=True))
         model.fit(train_data, train_labels, batch_size=args.batch_size, epochs=args.max_epoch)
 
+    '''
     model.eval()
     with torch.no_grad():
         for key in dataset.test_dict.keys():
@@ -56,6 +58,7 @@ def main():
                 json.dump(result, json_opened, indent=4)
 
             print(key)
+    '''
 
 
 def validate(model, dataset, batch_size=1):
