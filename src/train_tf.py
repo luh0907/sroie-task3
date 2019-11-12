@@ -3,11 +3,9 @@ import json
 
 import tensorflow as tf
 
-#from my_data import VOCAB, color_print
 from data_loader import Dataset, VOCAB, color_print
-#from my_models import MyModel0
 from models.SimpleBiLSTM import SimpleBiLSTM, SeqBiLSTM, SeqCuDNNBiLSTM
-from my_utils import pred_to_dict
+from my_utils import pred_to_dict, truth_to_dict, calc_accuracy, compare_truth
 import pickle
 
 def main():
@@ -39,7 +37,7 @@ def main():
 
         if args.val_only:
             model = tf.keras.models.load_model("saved/model.model")
-            validate(model, dataset)
+            validate(model, dataset, batch_size=args.val_size)
             exit(0)
 
         train_data, train_labels = dataset.get_train_data()
@@ -94,21 +92,47 @@ def get_val_data_from_pickle(keys_filename, data_filename, labels_filename):
     return keys, data, labels
 
 
-def validate(model, dataset, batch_size=1):
+def validate(model, dataset, batch_size=1, print_size=10):
     #keys, text, truth = dataset.get_val_data(batch_size=batch_size)
     keys, text, truth = get_val_data_from_pickle("saved/val_keys.pkl", "saved/val_data.pkl", "saved/val_labels.pkl")
     pred = model.predict_classes(text)
     prob = model.predict_proba(text)
 
-    for text_item, pred_item, prob_item in zip(text, pred, prob):
+    class_acc = 0.0
+    char_acc = 0.0
+    i = 0
+    for text_item, pred_item, prob_item, truth_item in zip(text, pred, prob, truth):
         #text_item, _ = dataset.val_dict[key]
         real_text = "".join([VOCAB[char_idx] for char_idx in text_item])
         result = pred_to_dict(real_text, pred_item, prob_item)
+        ground_truth = truth_to_dict(real_text, truth_item)
 
-        for k, v in result.items():
-            print(f"{k:>8}: {v}")
+        class_acc_unit = calc_accuracy(result, ground_truth)
+        char_acc_unit = compare_truth(result, ground_truth)
+        class_acc += class_acc_unit
+        char_acc += char_acc_unit
 
-        color_print(real_text, pred_item)
+        if i < print_size:
+            print("====== Val. number %d ======" % i)
+            for k, v in result.items():
+                print(f"{k:>8}: {v}")
+            print()
+
+            for k, v in ground_truth.items():
+                print(f"{k:>8}: {v}")
+            
+            print("-ACCURACY(Class): %.2f" % class_acc_unit)
+            print("-ACCURACY(Char) : %.2f" % char_acc_unit)
+            print()
+
+            color_print(real_text, pred_item)
+            print("============================")
+            print()
+        
+        i += 1
+
+    print("=ACCURACY(Class): %.2f" % (class_acc*100/batch_size))
+    print("=ACCURACY(Char) : %.2f" % (char_acc*100/batch_size))  
 
 '''
 def validate(model, dataset, batch_size=1):
