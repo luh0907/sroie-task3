@@ -6,7 +6,7 @@ import tensorflow as tf
 #from my_data import VOCAB, color_print
 from data_loader import Dataset, VOCAB, color_print
 #from my_models import MyModel0
-from models.SimpleBiLSTM import SimpleBiLSTM, SeqBiLSTM
+from models.SimpleBiLSTM import SimpleBiLSTM, SeqBiLSTM, SeqCuDNNBiLSTM
 from my_utils import pred_to_dict
 import pickle
 
@@ -27,7 +27,7 @@ def main():
     with tf.device("/"+args.device):
         #model = MyModel0(len(VOCAB), 16, args.hidden_size).to(args.device)
         #model = SimpleBiLSTM(len(VOCAB), 16, args.hidden_size)
-        bilstm_sequential = SeqBiLSTM(len(VOCAB), 16, args.hidden_size)
+        bilstm_sequential = SeqCuDNNBiLSTM(len(VOCAB), 16, args.hidden_size)
         model = bilstm_sequential.model
 
         dataset = Dataset(
@@ -38,23 +38,17 @@ def main():
         )
 
         if args.val_only:
-            model = tf.keras.models.load_model("model.model")
+            model = tf.keras.models.load_model("saved/model.model")
             validate(model, dataset)
             exit(0)
 
         train_data, train_labels = dataset.get_train_data()
         print(train_data.shape, train_labels.shape)
 
+        es = tf.keras.callbacks.EarlyStopping(monitor='loss', verbose=1, patience=10, min_delta=0.0005, restore_best_weights=True)
         model.compile(optimizer='adam', loss='sparse_categorical_crossentropy')
-        model.fit(train_data, train_labels, batch_size=args.batch_size, epochs=args.max_epoch)
+        model.fit(train_data, train_labels, batch_size=args.batch_size, epochs=args.max_epoch, callbacks=[es])
         
-        '''
-        model_json = model.to_json()
-        with open("model.json", 'w') as json_file:
-            json_file.write(model_json)
-
-        model.save_weights("model.h5")
-        '''
         tf.keras.models.save_model(model, "model.model", overwrite=True, include_optimizer=True)
 
         val_keys, val_data, val_labels = dataset.get_val_data(batch_size=76)
@@ -102,12 +96,18 @@ def get_val_data_from_pickle(keys_filename, data_filename, labels_filename):
 
 def validate(model, dataset, batch_size=1):
     #keys, text, truth = dataset.get_val_data(batch_size=batch_size)
-    keys, text, truth = get_val_data_from_pickle("val_keys.pkl", "val_data.pkl", "val_labels.pkl")
+    keys, text, truth = get_val_data_from_pickle("saved/val_keys.pkl", "saved/val_data.pkl", "saved/val_labels.pkl")
     pred = model.predict_classes(text)
+    prob = model.predict_proba(text)
 
-    for text_item, pred_item in zip(text, pred):
+    for text_item, pred_item, prob_item in zip(text, pred, prob):
         #text_item, _ = dataset.val_dict[key]
-        real_text = [VOCAB[char_idx] for char_idx in text_item]
+        real_text = "".join([VOCAB[char_idx] for char_idx in text_item])
+        result = pred_to_dict(real_text, pred_item, prob_item)
+
+        for k, v in result.items():
+            print(f"{k:>8}: {v}")
+
         color_print(real_text, pred_item)
 
 '''
