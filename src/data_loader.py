@@ -48,7 +48,7 @@ class Dataset(object):
 
         return text_data
 
-    def get_train_data(self, batch_size=8):
+    def get_train_data(self, batch_size=550):
         samples = random.sample(self.train_dict.keys(), batch_size)
 
         texts = [self.train_dict[k][0] for k in samples]
@@ -87,7 +87,7 @@ class Dataset(object):
 
         truth_data = np.zeros((batch_size, maxlen), dtype='int64')
         for i, label in enumerate(labels):
-            truth_tensor[i, :] = np.array(label)
+            truth_data[i, :] = np.array(label)
 
         return keys, text_data, truth_data
 

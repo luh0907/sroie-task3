@@ -6,15 +6,15 @@ import tensorflow as tf
 #from my_data import VOCAB, color_print
 from data_loader import Dataset, VOCAB, color_print
 #from my_models import MyModel0
-from models.SimpleBiLSTM import SimpleBiLSTM
+from models.SimpleBiLSTM import SimpleBiLSTM, SeqBiLSTM
 from my_utils import pred_to_dict
-
+import pickle
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("-d", "--device", default="cpu")
     parser.add_argument("-b", "--batch_size", type=int, default=16)
-    parser.add_argument("-e", "--max_epoch", type=int, default=1500)
+    parser.add_argument("-e", "--max_epoch", type=int, default=35)
     parser.add_argument("-v", "--val-at", type=int, default=100)
     parser.add_argument("-i", "--hidden-size", type=int, default=256)
     parser.add_argument("--val-size", type=int, default=76)
@@ -24,7 +24,9 @@ def main():
 
     with tf.device("/"+args.device):
         #model = MyModel0(len(VOCAB), 16, args.hidden_size).to(args.device)
-        model = SimpleBiLSTM(len(VOCAB), 16, args.hidden_size)
+        #model = SimpleBiLSTM(len(VOCAB), 16, args.hidden_size)
+        bilstm_sequential = SeqBiLSTM(len(VOCAB), 16, args.hidden_size)
+        model = bilstm_sequential.model
 
         dataset = Dataset(
             "data/data_dict4.pth",
@@ -32,11 +34,29 @@ def main():
             val_size=args.val_size,
             test_path="data/test_dict.pth",
         )
-        train_data, train_labels = dataset.get_train_data(batch_size=550)
+        train_data, train_labels = dataset.get_train_data()
         print(train_data.shape, train_labels.shape)
 
         model.compile(optimizer='adam', loss='sparse_categorical_crossentropy')
         model.fit(train_data, train_labels, batch_size=args.batch_size, epochs=args.max_epoch)
+        
+        '''
+        model_json = model.to_json()
+        with open("model.json", 'w') as json_file:
+            json_file.write(model_json)
+
+        model.save_weights("model.h5")
+        '''
+        tf.keras.models.save_model(model, "model.model", overwrite=True, include_optimizer=True)
+
+        val_keys, val_data, val_labels = dataset.get_val_data(batch_size=76)
+        with open("val_keys.pkl", 'wb') as val_keys_file:
+            pickle.dump(val_keys, val_keys_file)
+        with open("val_data.pkl", 'wb') as val_data_file:
+            pickle.dump(val_data, val_data_file)
+        with open("val_labels.pkl", 'wb') as val_labels_file:
+            pickle.dump(val_labels, val_labels_file)
+        
 
     '''
     model.eval()

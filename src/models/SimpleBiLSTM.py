@@ -1,5 +1,5 @@
 import tensorflow as tf
-from tensorflow.keras.models import Model
+from tensorflow.keras.models import Model, Sequential
 from tensorflow.keras.layers import Embedding, Bidirectional, Dense, LSTMCell, RNN
 
 class SimpleBiLSTM(Model):
@@ -24,4 +24,17 @@ class SimpleBiLSTM(Model):
         return outputs
 
 
+class SeqBiLSTM(object):
+    def __init__(self, vocab_size, embed_size, hidden_size):
+        self.embed = Embedding(vocab_size, embed_size)
+        self.lstm1 = LSTMCell(hidden_size)
+        self.lstm2 = LSTMCell(hidden_size)
+        self.stacked_lstm = RNN([self.lstm1, self.lstm2], return_sequences=True)
+        self.bilstm = Bidirectional(self.stacked_lstm)
+        self.linear = Dense(5, activation='softmax')
+
+        self.model = Sequential()
+        self.model.add(self.embed)
+        self.model.add(self.bilstm)
+        self.model.add(self.linear)
 
