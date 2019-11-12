@@ -24,12 +24,37 @@ def pred_to_dict(text, pred, prob):
     return {k: regex.sub(r"[\t\n]", " ", v[0].strip()) for k, v in res.items()}
 
 
+def truth_to_dict(text, truth):
+    res = {"company": "", "date": "", "address": "", "total": ""}
+    keys = list(res.keys())
+
+    seps = [0] + (numpy.nonzero(numpy.diff(truth))[0] + 1).tolist() + [len(truth)]
+    for i in range(len(seps) - 1):
+        truth_class = truth[seps[i]] - 1
+        if truth_class == -1:
+            continue
+
+        new_key = keys[truth_class]
+        res[new_key] = regex.sub(r"[\t\n]", " ", text[seps[i] : seps[i + 1]].strip())
+
+    return res
+
+
 def compare_truth(pred_dict, truth_dict):
     ratio = 0
     for k in truth_dict.keys():
         ratio += SequenceMatcher(None, truth_dict[k], pred_dict[k]).ratio()
 
     return ratio / len(truth_dict.keys())
+
+
+def calc_accuracy(pred_dict, truth_dict):
+    correct = 0
+    for k in truth_dict.keys():
+        if truth_dict[k] == pred_dict[k]:
+            correct += 1
+
+    return correct / len(truth_dict.keys())
 
 
 def robust_padding(texts, labels):
