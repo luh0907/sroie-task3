@@ -1,6 +1,6 @@
 import tensorflow as tf
 from tensorflow.keras.models import Model, Sequential
-from tensorflow.keras.layers import Embedding, Bidirectional, Dense, LSTMCell, RNN
+from tensorflow.keras.layers import Embedding, Bidirectional, Dense, LSTMCell, RNN, CuDNNLSTM
 
 class SimpleBiLSTM(Model):
     def __init__(self, vocab_size, embed_size, hidden_size):
@@ -36,5 +36,19 @@ class SeqBiLSTM(object):
         self.model = Sequential()
         self.model.add(self.embed)
         self.model.add(self.bilstm)
+        self.model.add(self.linear)
+
+
+class SeqCuDNNBiLSTM(object):
+    def __init__(self, vocab_size, embed_size, hidden_size):
+        self.embed = Embedding(vocab_size, embed_size)
+        self.bilstm1 = Bidirectional(CuDNNLSTM(hidden_size, return_sequences=True))
+        self.bilstm2 = Bidirectional(CuDNNLSTM(hidden_size, return_sequences=True))
+        self.linear = Dense(5, activation='softmax')
+
+        self.model = Sequential()
+        self.model.add(self.embed)
+        self.model.add(self.bilstm1)
+        self.model.add(self.bilstm2)
         self.model.add(self.linear)
 
