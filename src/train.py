@@ -6,7 +6,7 @@ from torch import nn, optim
 
 from my_data import VOCAB, MyDataset, color_print
 from my_models import MyModel0
-from my_utils import pred_to_dict
+from my_utils import pred_to_dict, truth_to_dict, calc_accuracy, compare_truth
 
 
 def main():
@@ -47,7 +47,7 @@ def main():
         )
         # validate(model, dataset)
 
-    # validate(model, dataset, batch_size=10)
+    validate(model, dataset, batch_size=76)
 
     torch.save(model.state_dict(), "model.pth")
 
@@ -69,10 +69,10 @@ def main():
             with open("results/" + key + ".json", "w", encoding="utf-8") as json_opened:
                 json.dump(result, json_opened, indent=4)
 
-            print(key)
+            #print(key)
 
 
-def validate(model, dataset, batch_size=1):
+def validate(model, dataset, batch_size=1, print_size=10):
     model.eval()
     with torch.no_grad():
         keys, text, truth = dataset.get_val_data(batch_size=batch_size)
@@ -84,14 +84,38 @@ def validate(model, dataset, batch_size=1):
         prob = prob.cpu().numpy()
         pred = pred.cpu().numpy()
 
+        class_acc = 0.0
+        char_acc = 0.0
+
         for i, key in enumerate(keys):
-            real_text, _ = dataset.val_dict[key]
+            real_text, real_label = dataset.val_dict[key]
             result = pred_to_dict(real_text, pred[:, i], prob[:, i])
+            ground_truth = truth_to_dict(real_text, real_label)
 
-            for k, v in result.items():
-                print(f"{k:>8}: {v}")
+            class_acc_unit = calc_accuracy(result, ground_truth)
+            char_acc_unit = compare_truth(result, ground_truth)
+            class_acc += class_acc_unit
+            char_acc += char_acc_unit
 
-            color_print(real_text, pred[:, i])
+            if i < print_size:
+                print("====== Val. number %d ======" % i)
+                for k, v in result.items():
+                    print(f"{k:>8}: {v}")
+                print()
+
+                for k, v in ground_truth.items():
+                    print(f"{k:>8}: {v}")
+            
+                print("-ACCURACY(Class): %.2f" % class_acc_unit)
+                print("-ACCURACY(Char) : %.2f" % char_acc_unit)
+                print()
+
+                color_print(real_text, pred[:, i])
+                print("============================")
+                print()
+
+        print("=ACCURACY(Class): %.2f" % (class_acc*100/batch_size))
+        print("=ACCURACY(Char) : %.2f" % (char_acc*100/batch_size))        
 
 
 def train(model, dataset, criterion, optimizer, epoch_range, batch_size):
