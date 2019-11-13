@@ -26,7 +26,6 @@ class Dataset(object):
             self.val_dict = {}
             self.train_dict = {}
         else:
-            #data_items = list(torch.load(dict_path).items())
             data_items = list(torchdict_loader(dict_path).items())
             random.shuffle(data_items)
 
@@ -36,19 +35,32 @@ class Dataset(object):
         if test_path is None:
             self.test_dict = {}
         else:
-            #self.test_dict = torch.load(test_path)
             self.test_dict = torchdict_loader(test_path)
 
         self.device = device
 
-    def get_test_data(self, key):
-        text = self.test_dict[key]
-        text_data = np.zeros((1, len(text)), dtype='int64')
-        text_data[0, :] = np.array([VOCAB.find(c) for c in text])
+    def get_test_data(self, key=None):
+        if key is None:
+            texts = [self.test_dict[key] for key in self.test_dict.keys()]
+    
+            maxlen = max(len(s) for s in texts)
+            texts = [s.ljust(maxlen, " ") for s in texts]
+
+            text_data = np.zeros((len(texts), maxlen), dtype='int64')
+            for i, text in enumerate(texts):
+                text_data[i, :] = np.array([VOCAB.find(c) for c in text])
+
+        else:
+            text = self.test_dict[key]
+            text_data = np.zeros((1, len(text)), dtype='int64')
+            text_data[0, :] = np.array([VOCAB.find(c) for c in text])
 
         return text_data
 
-    def get_train_data(self, batch_size=550):
+    def get_train_data(self, batch_size=None):
+        if batch_size is None:
+            batch_size = len(self.train_dict)
+
         samples = random.sample(self.train_dict.keys(), batch_size)
 
         texts = [self.train_dict[k][0] for k in samples]
@@ -68,7 +80,10 @@ class Dataset(object):
 
         return text_data, truth_data
 
-    def get_val_data(self, batch_size=8, device="cpu"):
+    def get_val_data(self, batch_size=None, device="cpu"):
+        if batch_size is None:
+            batch_size = len(self.val_dict)
+
         keys = random.sample(self.val_dict.keys(), batch_size)
 
         texts = [self.val_dict[k][0] for k in keys]
@@ -90,6 +105,25 @@ class Dataset(object):
             truth_data[i, :] = np.array(label)
 
         return keys, text_data, truth_data
+
+    def save_dataset(self, file_path):
+        dataset_dict = {}
+        dataset_dict['device'] = self.device
+        dataset_dict['train'] = self.train_dict
+        dataset_dict['val'] = self.val_dict
+        dataset_dict['test'] = self.test_dict
+
+        with open(file_path, 'wb') as f:
+            pickle.dump(dataset_dict, f)
+
+    def load_dataset(self, file_path):
+        with open(file_path, 'rb') as f:
+            dataset_dict = pickle.load(f)
+
+        self.device = dataset_dict['device']
+        self.train_dict = dataset_dict['train']
+        self.val_dict = dataset_dict['val']
+        self.test_dict = dataset_dict['test']
 
 
 def torchdict_loader(file_path):

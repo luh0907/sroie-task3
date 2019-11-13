@@ -1,14 +1,10 @@
 import argparse
-import json
-
 import tensorflow as tf
 
-from data_loader import Dataset, VOCAB, color_print
-from models.SimpleBiLSTM import SimpleBiLSTM, SeqBiLSTM, SeqCuDNNBiLSTM
-from my_utils import pred_to_dict, truth_to_dict, calc_accuracy, compare_truth
-import pickle
+from data_loader import Dataset, VOCAB
+from models.SimpleBiLSTM import SeqCuDNNBiLSTM
 
-def main():
+if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-d", "--device", default="cpu")
     parser.add_argument("-b", "--batch_size", type=int, default=16)
@@ -16,15 +12,10 @@ def main():
     parser.add_argument("-v", "--val-at", type=int, default=100)
     parser.add_argument("-i", "--hidden-size", type=int, default=256)
     parser.add_argument("--val-size", type=int, default=76)
-    parser.add_argument("--val-only", dest='val_only', action='store_true')
-    parser.set_defaults(val_only=False)
 
     args = parser.parse_args()
-    #args.device = torch.device(args.device)
      
     with tf.device("/"+args.device):
-        #model = MyModel0(len(VOCAB), 16, args.hidden_size).to(args.device)
-        #model = SimpleBiLSTM(len(VOCAB), 16, args.hidden_size)
         bilstm_sequential = SeqCuDNNBiLSTM(len(VOCAB), 16, args.hidden_size)
         model = bilstm_sequential.model
 
@@ -35,144 +26,13 @@ def main():
             test_path="data/test_dict.pth",
         )
 
-        if args.val_only:
-            model = tf.keras.models.load_model("saved/model.model")
-            validate(model, dataset, batch_size=args.val_size)
-            exit(0)
-
         train_data, train_labels = dataset.get_train_data()
-        print(train_data.shape, train_labels.shape)
+        train_labels = tf.keras.utils.to_categorical(train_labels)
 
         es = tf.keras.callbacks.EarlyStopping(monitor='loss', verbose=1, patience=10, min_delta=0.0005, restore_best_weights=True)
-        model.compile(optimizer='adam', loss='sparse_categorical_crossentropy')
-        model.fit(train_data, train_labels, batch_size=args.batch_size, epochs=args.max_epoch, callbacks=[es])
+        model.compile(optimizer='adam', loss='categorical_crossentropy', sample_weight_mode="temporal")
+        model.fit(train_data, train_labels, batch_size=args.batch_size, epochs=args.max_epoch, class_weight=[0.1, 1, 1.2, 0.8, 1.5], callbacks=[es])
         
         tf.keras.models.save_model(model, "model.model", overwrite=True, include_optimizer=True)
+        dataset.save_dataset("dataset.pkl")
 
-        val_keys, val_data, val_labels = dataset.get_val_data(batch_size=76)
-        with open("val_keys.pkl", 'wb') as val_keys_file:
-            pickle.dump(val_keys, val_keys_file)
-        with open("val_data.pkl", 'wb') as val_data_file:
-            pickle.dump(val_data, val_data_file)
-        with open("val_labels.pkl", 'wb') as val_labels_file:
-            pickle.dump(val_labels, val_labels_file)
-        
-
-    '''
-    model.eval()
-    with torch.no_grad():
-        for key in dataset.test_dict.keys():
-            text_tensor = dataset.get_test_data(key)
-
-            oupt = model(text_tensor)
-            prob = torch.nn.functional.softmax(oupt, dim=2)
-            prob, pred = torch.max(prob, dim=2)
-
-            prob = prob.squeeze().cpu().numpy()
-            pred = pred.squeeze().cpu().numpy()
-
-            real_text = dataset.test_dict[key]
-            result = pred_to_dict(real_text, pred, prob)
-
-            with open("results/" + key + ".json", "w", encoding="utf-8") as json_opened:
-                json.dump(result, json_opened, indent=4)
-
-            print(key)
-    '''
-
-
-def get_val_data_from_pickle(keys_filename, data_filename, labels_filename):
-    with open(keys_filename, 'rb') as keys_file:
-        keys = pickle.load(keys_file)
-    with open(data_filename, 'rb') as data_file:
-        data = pickle.load(data_file)
-    with open(labels_filename, 'rb') as labels_file:
-        labels = pickle.load(labels_file)
-
-    return keys, data, labels
-
-
-def validate(model, dataset, batch_size=1, print_size=10):
-    #keys, text, truth = dataset.get_val_data(batch_size=batch_size)
-    keys, text, truth = get_val_data_from_pickle("saved/val_keys.pkl", "saved/val_data.pkl", "saved/val_labels.pkl")
-    pred = model.predict_classes(text)
-    prob = model.predict_proba(text)
-
-    class_acc = 0.0
-    char_acc = 0.0
-    i = 0
-    for text_item, pred_item, prob_item, truth_item in zip(text, pred, prob, truth):
-        #text_item, _ = dataset.val_dict[key]
-        real_text = "".join([VOCAB[char_idx] for char_idx in text_item])
-        result = pred_to_dict(real_text, pred_item, prob_item)
-        ground_truth = truth_to_dict(real_text, truth_item)
-
-        class_acc_unit = calc_accuracy(result, ground_truth)
-        char_acc_unit = compare_truth(result, ground_truth)
-        class_acc += class_acc_unit
-        char_acc += char_acc_unit
-
-        if i < print_size:
-            print("====== Val. number %d ======" % i)
-            for k, v in result.items():
-                print(f"{k:>8}: {v}")
-            print()
-
-            for k, v in ground_truth.items():
-                print(f"{k:>8}: {v}")
-            
-            print("-ACCURACY(Class): %.2f" % class_acc_unit)
-            print("-ACCURACY(Char) : %.2f" % char_acc_unit)
-            print()
-
-            color_print(real_text, pred_item)
-            print("============================")
-            print()
-        
-        i += 1
-
-    print("=ACCURACY(Class): %.2f" % (class_acc*100/batch_size))
-    print("=ACCURACY(Char) : %.2f" % (char_acc*100/batch_size))  
-
-'''
-def validate(model, dataset, batch_size=1):
-    model.eval()
-    with torch.no_grad():
-        keys, text, truth = dataset.get_val_data(batch_size=batch_size)
-
-        oupt = model(text)
-        prob = torch.nn.functional.softmax(oupt, dim=2)
-        prob, pred = torch.max(prob, dim=2)
-
-        prob = prob.cpu().numpy()
-        pred = pred.cpu().numpy()
-
-        for i, key in enumerate(keys):
-            real_text, _ = dataset.val_dict[key]
-            result = pred_to_dict(real_text, pred[:, i], prob[:, i])
-
-            for k, v in result.items():
-                print(f"{k:>8}: {v}")
-
-            color_print(real_text, pred[:, i])
-'''
-
-def train(model, dataset, criterion, optimizer, epoch_range, batch_size):
-    model.train()
-
-    for epoch in range(*epoch_range):
-        optimizer.zero_grad()
-
-        text, truth = dataset.get_train_data(batch_size=batch_size)
-        pred = model(text)
-
-        loss = criterion(pred.view(-1, 5), truth.view(-1))
-        loss.backward()
-
-        optimizer.step()
-
-        print(f"#{epoch:04d} | Loss: {loss.item():.4f}")
-
-
-if __name__ == "__main__":
-    main()
