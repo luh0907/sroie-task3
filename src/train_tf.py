@@ -29,7 +29,7 @@ if __name__ == "__main__":
         train_data, train_labels = dataset.get_train_data()
         train_labels = tf.keras.utils.to_categorical(train_labels)
 
-        es = tf.keras.callbacks.EarlyStopping(monitor='loss', verbose=1, patience=10, min_delta=0.0005, restore_best_weights=True)
+        es = tf.keras.callbacks.EarlyStopping(monitor='loss', verbose=1, patience=50, restore_best_weights=True)
         model.compile(optimizer='adam', loss='categorical_crossentropy', sample_weight_mode="temporal")
         model.fit(train_data, train_labels, batch_size=args.batch_size, epochs=args.max_epoch, class_weight=[0.1, 1, 1.2, 0.8, 1.5], callbacks=[es])
         
